@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"os/exec"
 	"time"
 )
 
@@ -19,7 +22,7 @@ type GetIssueResult struct {
 type Issue struct {
 	Number    int
 	HTMLURL   string `json:"html_url"`
-	Title     string
+	Title     string `json:"title"`
 	State     string
 	User      *User
 	CreatedAt time.Time `json:"created_at"`
@@ -33,7 +36,6 @@ type User struct {
 
 func getIssues() ([]*Issue, error) {
 	client := &http.Client{}
-
 	req, err := http.NewRequest("GET", APIURL, nil)
 	if err != nil {
 		return nil, err
@@ -64,27 +66,20 @@ func createIssue(title string) error {
 	body := Issue{Title: title}
 
 	var buf bytes.Buffer
-
 	err := json.NewEncoder(&buf).Encode(body)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("json %v\n", body)
-
 	req, err := http.NewRequest("POST", APIURL, &buf)
 	if err != nil {
 		return err
 	}
-
 	req.Header.Add("Authorization", "token "+TOKEN)
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("request %v\n", req.Method)
 
 	if resp.StatusCode != http.StatusCreated {
 		resp.Body.Close()
@@ -95,6 +90,20 @@ func createIssue(title string) error {
 }
 
 func main() {
+	cmd := exec.Command("vim", "test.txt")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "starting vim %v\n", err)
+		log.Fatal(err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		fmt.Fprintf(os.Stderr, "waiting for vim %v\n", err)
+		log.Fatal(err)
+	}
+
 	err := createIssue("my first issue from go")
 	if err != nil {
 		fmt.Printf("create issue : %v", err)
