@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -89,22 +90,41 @@ func createIssue(title string) error {
 	return nil
 }
 
-func main() {
-	cmd := exec.Command("vim", "test.txt")
+const (
+	FILE = "message.txt"
+)
+
+func getMessage() (string, error) {
+	cmd := exec.Command("vim", FILE)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "starting vim %v\n", err)
-		log.Fatal(err)
+		return "", fmt.Errorf("starting vim %v\n", err)
 	}
 
 	if err := cmd.Wait(); err != nil {
-		fmt.Fprintf(os.Stderr, "waiting for vim %v\n", err)
-		log.Fatal(err)
+		return "", fmt.Errorf("waiting for vim %v\n", err)
 	}
 
-	err := createIssue("my first issue from go")
+	file, err := os.Open(FILE)
+	if err != nil {
+		return "", fmt.Errorf("opening file %v\n", err)
+	}
+	msgBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", fmt.Errorf("reading file %v\n", err)
+	}
+	file.Close()
+	return string(msgBytes), nil
+}
+
+func main() {
+	msg, err := getMessage()
+	if err != nil {
+		log.Fatalf("getting message: %v", err)
+	}
+	err = createIssue(msg)
 	if err != nil {
 		fmt.Printf("create issue : %v", err)
 	}
