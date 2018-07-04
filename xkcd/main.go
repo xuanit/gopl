@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,8 +22,9 @@ const (
 )
 
 const (
-	PATH      = "data"
-	ITEM_FILE = "item"
+	PATH       = "data"
+	ITEM_FILE  = "item"
+	INDEX_FILE = "index.txt"
 )
 
 type Comic struct {
@@ -32,6 +34,11 @@ type Comic struct {
 type Item struct {
 	URL        string
 	Transcript string
+}
+
+type SearchResult struct {
+	Url         string
+	Transacript string
 }
 
 func crawlData(url string) (Comic, error) {
@@ -85,7 +92,7 @@ func updateIndex(comic Comic, i int, index map[string][]int) {
 }
 
 func saveIndex(index map[string][]int) error {
-	file, err := os.Create(PATH + "/" + "index.txt")
+	file, err := os.Create(PATH + "/" + INDEX_FILE)
 	if err != nil {
 		return fmt.Errorf("Creating index file: %v", err)
 	}
@@ -129,9 +136,70 @@ func buildIndex() error {
 	return nil
 }
 
-func main() {
-	err := buildIndex()
+func search(query string) ([]*SearchResult, error) {
+	fmt.Printf("Searching by query %s\n", query)
+
+	file, err := os.Open(PATH + "/" + INDEX_FILE)
 	if err != nil {
-		log.Fatalf("xkcd: %v", err)
+		return nil, fmt.Errorf("Reading index file: %v", err)
 	}
+
+	var index map[string][]int
+	if err := json.NewDecoder(file).Decode(&index); err != nil {
+		return nil, fmt.Errorf("Parsing index file: %v", err)
+	}
+
+	s, _ := json.Marshal(index)
+	fmt.Printf("Index %s\n", s)
+
+	itemIndexes := index[query]
+
+	fmt.Printf("result length %d\n", len(itemIndexes))
+	result := []*SearchResult{}
+	for _, v := range itemIndexes {
+		itemFile, err := os.Open(PATH + "/" + ITEM_FILE + "_" + strconv.Itoa(v))
+		if err != nil {
+			return nil, fmt.Errorf("Opening item file: %v", err)
+		}
+
+		var item Item
+		if err := json.NewDecoder(itemFile).Decode(&item); err != nil {
+			return nil, fmt.Errorf("Parsing item file: %v", err)
+		}
+		result = append(result, &SearchResult{Url: item.URL, Transacript: item.Transcript})
+	}
+
+	return result, nil
+}
+
+func main() {
+	queryPtr := flag.String("query", "", "query string")
+	flag.Parse()
+
+	// fmt.Printf("queryPtr %s\n", *queryPtr)
+	// fmt.Printf("Args %v\n", flag.Args())
+	cmd := flag.Args()[0]
+	switch cmd {
+	case "index":
+		{
+			err := buildIndex()
+			if err != nil {
+				log.Fatalf("xkcd indexing: %v", err)
+			}
+		}
+	case "search":
+		{
+			results, err := search(*queryPtr)
+			if err != nil {
+				log.Fatalf("xkcd searching: %v", err)
+			}
+
+			fmt.Printf("url\ttranscript\n")
+			for _, v := range results {
+				fmt.Printf("%s\t%s", v.Url, v.Transacript)
+			}
+		}
+
+	}
+
 }
