@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 
@@ -10,50 +11,57 @@ import (
 )
 
 func main() {
-	n, err := html.Parse(os.Stdin)
+	Prettier(os.Stdin, os.Stdout)
+}
+
+func Prettier(in io.Reader, out io.Writer) {
+	n, err := html.Parse(in)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	visit(n, startELement, endElement)
-
+	visit(n, startELement(out), endElement(out))
 }
 
 var depth int
 
-func startELement(n *html.Node) {
-	if n.Type == html.ElementNode {
-		var attrBuf bytes.Buffer
-		for _, attr := range n.Attr {
-			attrBuf.WriteString(attr.Key)
-			attrBuf.WriteString("=")
-			attrBuf.WriteString(attr.Val)
-			attrBuf.WriteString(" ")
+func startELement(out io.Writer) func(*html.Node) {
+	return func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			var attrBuf bytes.Buffer
+			for _, attr := range n.Attr {
+				attrBuf.WriteString(attr.Key)
+				attrBuf.WriteString("=")
+				attrBuf.WriteString(attr.Val)
+				attrBuf.WriteString(" ")
+			}
+
+			if n.FirstChild == nil {
+				fmt.Fprintf(out, "%*s<%s %s", depth*2, " ", n.Data, attrBuf.String())
+			} else {
+				fmt.Fprintf(out, "%*s<%s %s>\n", depth*2, " ", n.Data, attrBuf.String())
+				depth++
+			}
+			return
 		}
 
-		if n.FirstChild == nil {
-			fmt.Printf("%*s<%s %s", depth*2, " ", n.Data, attrBuf.String())
-		} else {
-			fmt.Printf("%*s<%s %s>\n", depth*2, " ", n.Data, attrBuf.String())
-			depth++
+		if n.Type == html.TextNode {
+			fmt.Fprintf(out, "%*s%s\n", depth*2, " ", n.Data)
+			return
 		}
-		return
-	}
-
-	if n.Type == html.TextNode {
-		fmt.Printf("%*s%s\n", depth*2, " ", n.Data)
-		return
 	}
 
 }
 
-func endElement(n *html.Node) {
-	if n.Type == html.ElementNode {
-		if n.FirstChild == nil {
-			fmt.Printf(" />\n")
-		} else {
-			depth--
-			fmt.Printf("%*s</%s>\n", 2*depth, " ", n.Data)
+func endElement(out io.Writer) func(*html.Node) {
+	return func(n *html.Node) {
+		if n.Type == html.ElementNode {
+			if n.FirstChild == nil {
+				fmt.Fprintf(out, " />\n")
+			} else {
+				depth--
+				fmt.Fprintf(out, "%*s</%s>\n", 2*depth, " ", n.Data)
+			}
 		}
 	}
 }
