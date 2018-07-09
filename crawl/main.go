@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"golang.org/x/net/html"
 )
@@ -68,22 +68,27 @@ func breadthFirst(f func(item string) []string, worklist []string) {
 
 const SEPARATOR = "/"
 
+func isSlash(r rune) bool {
+	return r == '/'
+}
+
+const DATA = "data"
+
 func savePage(resp *http.Response) {
 	if resp.Request.Host == "golang.org" {
-		parts := strings.Split(url, SEPARATOR)
-		fmt.Printf("%v parts %v\n", len(parts), parts)
-		if len(parts) == 3 {
-			parts = append(parts, "index")
-		}
-		path := strings.Join(parts[3:len(parts)-1], SEPARATOR)
-		err := os.MkdirAll(path, os.ModeDir)
+		fmt.Printf("path %v\n", resp.Request.URL.Path)
+		dir := DATA + filepath.Dir(resp.Request.URL.Path)
+
+		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
-			log.Printf("creating dir %s: %v", path, err)
+			log.Printf("creating dir %s: %v", dir, err)
 		}
-		file, err := os.Create(path + "/" + parts[len(parts)-1])
+
+		file, err := os.Create(DATA + resp.Request.URL.Path)
 		if err != nil {
-			log.Printf("creating file %s: %v", parts[len(parts)-1], err)
+			log.Printf("creating file %s: %v", DATA+resp.Request.URL.Path, err)
 		}
+
 		var body []byte
 		out := bufio.NewWriter(file)
 		_, err = resp.Body.Read(body)
@@ -108,32 +113,7 @@ func crawl(url string) []string {
 		log.Printf("getting %s: %s", url, resp.Status)
 	}
 
-	if resp.Request.Host == "golang.org" {
-		parts := strings.Split(url, SEPARATOR)
-		fmt.Printf("%v parts %v\n", len(parts), parts)
-		if len(parts) == 3 {
-			parts = append(parts, "index")
-		}
-		path := strings.Join(parts[3:len(parts)-1], SEPARATOR)
-		err := os.MkdirAll(path, os.ModeDir)
-		if err != nil {
-			log.Printf("creating dir %s: %v", path, err)
-		}
-		file, err := os.Create(path + "/" + parts[len(parts)-1])
-		if err != nil {
-			log.Printf("creating file %s: %v", parts[len(parts)-1], err)
-		}
-		var body []byte
-		out := bufio.NewWriter(file)
-		_, err = resp.Body.Read(body)
-		if err != nil {
-			log.Printf("reading response: %v", err)
-		}
-		_, err = out.Write(body)
-		if err != nil {
-			log.Printf("writing data: %v", err)
-		}
-	}
+	savePage(resp)
 
 	list, err := Extract(resp)
 	if err != nil {
