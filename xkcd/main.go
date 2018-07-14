@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MAX = 4
+	MAX = 512
 )
 
 const (

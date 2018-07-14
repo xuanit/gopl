@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -72,21 +73,24 @@ func isSlash(r rune) bool {
 	return r == '/'
 }
 
-const DATA = "data"
+const DATA = "./data"
 
 func savePage(resp *http.Response) {
-	if resp.Request.Host == "golang.org" {
-		fmt.Printf("path %v\n", resp.Request.URL.Path)
-		dir := DATA + filepath.Dir(resp.Request.URL.Path)
+	canonicalURL := strings.TrimRightFunc(resp.Request.URL.Path, isSlash)
 
+	if resp.Request.Host == "golang.org" {
+		fmt.Printf("path %v\n", canonicalURL)
+		dir := DATA + filepath.Dir(canonicalURL)
+
+		fmt.Printf("dir %s\n", dir)
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
-			log.Printf("creating dir %s: %v", dir, err)
+			log.Printf("creating dir2 %s: %v", dir, err)
 		}
 
-		file, err := os.Create(DATA + resp.Request.URL.Path)
+		file, err := os.Create(DATA + canonicalURL)
 		if err != nil {
-			log.Printf("creating file %s: %v", DATA+resp.Request.URL.Path, err)
+			log.Printf("creating file %s: %v", DATA+canonicalURL, err)
 		}
 
 		var body []byte
